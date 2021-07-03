@@ -5,7 +5,7 @@ documentation = "https://github.com/aidenlangley/chrono_elapsed"
 edition = "2018"
 homepage = "https://github.com/aidenlangley/chrono_elapsed"
 license = "MIT OR Apache-2.0"
-name = "chrono_elapse"
+name = "chrono_elapsed"
 repository = "https://github.com/aidenlangley/chrono_elapsed"
 version = "0.1.0"
 
