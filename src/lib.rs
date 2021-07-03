@@ -1,3 +1,5 @@
+use std::{collections::HashMap, convert::TryFrom};
+
 use chrono::{Date, DateTime, Duration, Local, Utc};
 
 /**
@@ -10,8 +12,8 @@ years and 9 months`.
 
 Aliased as `DueDateTime` out of the box in case that makes more sense in your context.
 */
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Elapsed {
+#[derive(Debug, Clone)]
+pub struct Elapsed<'a> {
     /**
     The `DateTime` that gives this meaningful context, will default to `now`, but can be modified to
     get elapsed time between dates.
@@ -19,15 +21,29 @@ pub struct Elapsed {
     datetime_context: DateTime<Local>,
     datetime: DateTime<Local>,
     date: Date<Local>,
+    /**
+    Also known as the `diff`, difference in time between a given `DateTime` and the `DateTime1 used
+    for context.
+    */
     duration: Duration,
+    /**
+    If the date has already `passed`, or `elapsed`, it's no longer `due` so we can skip some
+    processing.
+    */
     passed: bool,
-    // format: &'static str,
+    /**
+    A cache of `diff` values.
+    Key being the sec/min/hour/day, etc. identifier.
+    Value being a tuple of the `diff` value as a string in pos 0, and numeric value in pos 1.
+    */
+    cache: HashMap<TimeFrame, (&'a str, usize)>, // format: &'static str,
 }
 
 /** Aliasing `Elapsed` as `DueDateTime` because both make sense, depending on use-case. */
-pub type DueDateTime = Elapsed;
+pub type DueDateTime<'a> = Elapsed<'a>;
 
-impl Elapsed {
+impl Elapsed<'_> {
+    /** Construct a new object. */
     pub fn new(datetime: DateTime<Local>) -> Self {
         let datetime_context = Local::now();
         Self {
@@ -36,8 +52,11 @@ impl Elapsed {
             date: datetime.date(),
             duration: datetime.signed_duration_since(datetime_context),
             passed: datetime.le(&datetime_context),
+            cache: HashMap::new(),
         }
     }
+
+    /** Construct a new object from a `Date` rather than `DateTime`. */
     pub fn new_from_date(date: Date<Local>) -> Self {
         let datetime = date.and_hms(0, 0, 0);
         let datetime_context = Local::now();
@@ -47,8 +66,11 @@ impl Elapsed {
             date,
             duration: datetime.signed_duration_since(datetime_context),
             passed: datetime.le(&datetime_context),
+            cache: HashMap::new(),
         }
     }
+
+    /** Construct a new object and then add `Local` timezone. */
     pub fn new_then_localize(datetime: DateTime<Utc>) -> Self {
         let datetime_context = Local::now();
         let datetime = datetime.with_timezone(&Local);
@@ -58,8 +80,11 @@ impl Elapsed {
             date: datetime.date(),
             duration: datetime.signed_duration_since(datetime_context),
             passed: datetime.le(&datetime_context),
+            cache: HashMap::new(),
         }
     }
+
+    /** Construct a new object from a `Date` then add `Local` timezone. */
     pub fn new_from_date_then_localize(date: Date<Utc>) -> Self {
         let datetime = date.and_hms(0, 0, 0).with_timezone(&Local);
         let datetime_context = Local::now();
@@ -69,8 +94,11 @@ impl Elapsed {
             date: datetime.date(),
             duration: datetime.signed_duration_since(datetime_context),
             passed: datetime.le(&datetime_context),
+            cache: HashMap::new(),
         }
     }
+
+    /** Construct a new object with a custom `context`, rather than the default `now`. */
     pub fn new_with_context(datetime: DateTime<Local>, context: DateTime<Local>) -> Self {
         Self {
             datetime_context: context,
@@ -78,8 +106,11 @@ impl Elapsed {
             date: datetime.date(),
             duration: datetime.signed_duration_since(context),
             passed: datetime.le(&context),
+            cache: HashMap::new(),
         }
     }
+
+    /** Construct a new object from a `Date` with a custom `context`. */
     pub fn new_from_date_with_context(date: Date<Local>, context: Date<Local>) -> Self {
         let datetime = date.and_hms(0, 0, 0);
         let datetime_context = context.and_hms(0, 0, 0);
@@ -89,34 +120,184 @@ impl Elapsed {
             date,
             duration: datetime.signed_duration_since(datetime_context),
             passed: datetime.le(&datetime_context),
+            cache: HashMap::new(),
         }
+    }
+
+    /** Set the `Elapsed`'s datetime_context. Will clear cached `diff` values. */
+    pub fn set_datetime_context(&mut self, datetime_context: DateTime<Local>) -> &mut Self {
+        self.datetime_context = datetime_context;
+        self.duration = self.datetime.signed_duration_since(datetime_context);
+        self.passed = self.datetime.le(&self.datetime_context);
+        self
+    }
+
+    /** Set the `Elapsed`'s datetime. Will clear cached `diff` values. */
+    pub fn set_datetime(&mut self, datetime: DateTime<Local>) -> &mut Self {
+        self.datetime = datetime;
+        self.date = datetime.date();
+        self.duration = datetime.signed_duration_since(self.datetime_context);
+        self.passed = datetime.le(&self.datetime_context);
+        self
+    }
+
+    /** Set the `Elapsed`'s date. Will clear cached `diff` values. */
+    pub fn set_date(&mut self, date: Date<Local>) {
+        self.date = date;
+        self.datetime = date.and_hms(0, 0, 0);
+        self.duration = self.datetime.signed_duration_since(self.datetime_context);
+        self.passed = self.datetime.le(&self.datetime_context);
     }
 }
 
-impl From<DateTime<Local>> for Elapsed {
+impl From<DateTime<Local>> for Elapsed<'_> {
+    /** Construct _from_ localised `DateTime`. */
     fn from(datetime: DateTime<Local>) -> Self {
         Self::new(datetime)
     }
 }
 
-impl From<Date<Local>> for Elapsed {
+impl From<Date<Local>> for Elapsed<'_> {
+    /** Construct _from_ localised `Date`. */
     fn from(date: Date<Local>) -> Self {
         Self::new_from_date(date)
     }
 }
 
-impl From<DateTime<Utc>> for Elapsed {
+impl From<DateTime<Utc>> for Elapsed<'_> {
+    /** Construct _from_ UTC `DateTime`. */
     fn from(datetime: DateTime<Utc>) -> Self {
         Self::new_then_localize(datetime)
     }
 }
 
-impl From<Date<Utc>> for Elapsed {
+impl From<Date<Utc>> for Elapsed<'_> {
+    /** Construct _from_ UTC `Date`. */
     fn from(date: Date<Utc>) -> Self {
         Self::new_from_date_then_localize(date)
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum TimeFrame {
+    /*
+    Tempted to leave millisecond out because by virtue this crate isn't dealing with micro and nano
+    seconds, but milliseconds are useful in the Unix world. A millisecond to us wouldn't ever be
+    more than 60 however.
+    */
+    MilliSecond,
+    Second,
+    Minute,
+    Hour,
+    Day,
+    Week,
+    Month,
+    Year,
+    // Decade ...
+}
+
+impl From<TimeFrame> for String {
+    /** Return `String` from `TimeFrame`. */
+    fn from(tf: TimeFrame) -> Self {
+        match tf {
+            TimeFrame::MilliSecond => String::from("millisecond(s)"),
+            TimeFrame::Second => String::from("second(s)"),
+            TimeFrame::Minute => String::from("minute(s)"),
+            TimeFrame::Hour => String::from("hour(s)"),
+            TimeFrame::Day => String::from("day(s)"),
+            TimeFrame::Week => String::from("week(s)"),
+            TimeFrame::Month => String::from("month(s)"),
+            TimeFrame::Year => String::from("year(s)"),
+        }
+    }
+}
+
+impl TryFrom<&str> for TimeFrame {
+    type Error = &'static str;
+    /** Attempt to parse `str` to `TimeFrame`. */
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value.to_lowercase().trim() {
+            "millisecond" | "ms" => Ok(Self::MilliSecond),
+            "second" | "sec" | "s" => Ok(Self::Second),
+            "minute" | "min" => Ok(Self::Minute),
+            "hour" | "hr" | "h" => Ok(Self::Hour),
+            "day" | "d" => Ok(Self::Day),
+            "week" | "wk" | "w" => Ok(Self::Week),
+            "month" | "mon" => Ok(Self::Month),
+            "year" | "yr" | "y" => Ok(Self::Year),
+            _ => Err("Invalid or ambiguous string for `elapsed::TimeFrame`"),
+        }
+    }
+}
+
+impl From<TimeFrame> for char {
+    /** Return `char` from `TimeFrame`. */
+    fn from(tf: TimeFrame) -> Self {
+        match tf {
+            TimeFrame::MilliSecond => 'm',
+            TimeFrame::Second => 's',
+            TimeFrame::Minute => 'm',
+            TimeFrame::Hour => 'h',
+            TimeFrame::Day => 'd',
+            TimeFrame::Week => 'w',
+            TimeFrame::Month => 'm',
+            TimeFrame::Year => 'y',
+        }
+    }
+}
+
+impl TryFrom<char> for TimeFrame {
+    type Error = &'static str;
+    /** Attempt to parse `char` to `TimeFrame`. clashes will fail (m for ms, min, month). */
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        match value.to_ascii_lowercase() {
+            's' => Ok(Self::Second),
+            'h' => Ok(Self::Hour),
+            'd' => Ok(Self::Day),
+            'w' => Ok(Self::Week),
+            'y' => Ok(Self::Year),
+            _ => Err("Invalid or ambiguous char for `elapsed::TimeFrame`"),
+        }
+    }
+}
+
+pub trait Abbreviate {
+    fn abbrev(&self) -> &str;
+    fn abbrev_short(&self) -> &str;
+}
+
+impl Abbreviate for TimeFrame {
+    /** Abbreviate `TimeFrame` to reasonably short string. */
+    fn abbrev(&self) -> &str {
+        match self {
+            TimeFrame::MilliSecond => "ms",
+            TimeFrame::Second => "sec",
+            TimeFrame::Minute => "min",
+            TimeFrame::Hour => "hr",
+            TimeFrame::Day => "d",
+            TimeFrame::Week => "w",
+            TimeFrame::Month => "m",
+            TimeFrame::Year => "y",
+        }
+    }
+
+    /**
+    Abbreviate `TimeFrame` to a still sensibly short string, mostly just a char except when there
+    are clashes (ms, min, month).
+    */
+    fn abbrev_short(&self) -> &str {
+        match self {
+            TimeFrame::MilliSecond => "ms",
+            TimeFrame::Second => "s",
+            TimeFrame::Minute => "min",
+            TimeFrame::Hour => "h",
+            TimeFrame::Day => "d",
+            TimeFrame::Week => "w",
+            TimeFrame::Month => "m",
+            TimeFrame::Year => "y",
+        }
+    }
+}
 
 // /**
 // Compute the model's `due_in` string and `due_in_unix` timestamp from `due` `date` or `datetime`.
