@@ -1,7 +1,12 @@
 [package]
 authors = ["Aiden Langley <me@aidenlangley.com>"]
+description = "A simple extension of chrono. Answers questions like: how much time has elapsed since date y? How long until date x will be upon us?"
+documentation = "https://github.com/aidenlangley/elapsed"
 edition = "2018"
+homepage = "https://github.com/aidenlangley/elapsed"
+license = "MIT OR Apache-2.0"
 name = "elapsed"
+repository = "https://github.com/aidenlangley/elapsed"
 version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
