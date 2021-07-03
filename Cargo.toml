@@ -8,6 +8,8 @@ license = "MIT OR Apache-2.0"
 name = "chrono_elapsed"
 repository = "https://github.com/aidenlangley/chrono_elapsed"
 version = "0.1.0"
+keywords = ["chrono", "duration", "due", "elapsed", "datetime"]
+categories = ["date-and-time"]
 
 [dependencies]
 chrono = "0.4.19"
