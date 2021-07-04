@@ -7,7 +7,7 @@ homepage = "https://github.com/aidenlangley/chrono_elapsed"
 license = "MIT OR Apache-2.0"
 name = "chrono_elapsed"
 repository = "https://github.com/aidenlangley/chrono_elapsed"
-version = "0.1.4"
+version = "0.1.41"
 keywords = ["chrono", "duration", "due", "elapsed", "datetime"]
 categories = ["date-and-time"]
 
