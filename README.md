@@ -1,6 +1,6 @@
 # chrono_elapsed
 
-https://crates.io/crates/chrono_elapsed.
+[crates.io](https://crates.io/crates/chrono_elapsed) | [docs.rs](https://docs.rs/chrono_elapsed/)
 
 An extension of [chrono](https://crates.io/crates/chrono) to assist in reporting
 on due dates. I wrote this because I'm  building a [CLI](https://github.com/aidenlangley/clogi)
