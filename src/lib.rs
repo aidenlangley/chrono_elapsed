@@ -50,82 +50,94 @@ impl Elapsed {
     /** Construct a new object. */
     pub fn new(datetime: DateTime<Local>) -> Self {
         let datetime_context = Local::now();
-        Self {
+        let mut obj = Self {
             datetime_context,
             datetime,
             date: datetime.date(),
             duration: datetime.signed_duration_since(datetime_context),
             passed: datetime.le(&datetime_context),
             cache: HashMap::new(),
-        }
+        };
+        obj.process(false);
+        obj
     }
 
     /** Construct a new object from a `Date` rather than `DateTime`. */
     pub fn new_from_date(date: Date<Local>) -> Self {
         let datetime = date.and_hms(0, 0, 0);
         let datetime_context = Local::now();
-        Self {
+        let mut obj = Self {
             datetime_context,
             datetime,
             date,
             duration: datetime.signed_duration_since(datetime_context),
             passed: datetime.le(&datetime_context),
             cache: HashMap::new(),
-        }
+        };
+        obj.process(false);
+        obj
     }
 
     /** Construct a new object and then add `Local` timezone. */
     pub fn new_then_localize(datetime: DateTime<Utc>) -> Self {
         let datetime_context = Local::now();
         let datetime = datetime.with_timezone(&Local);
-        Self {
+        let mut obj = Self {
             datetime_context,
             datetime,
             date: datetime.date(),
             duration: datetime.signed_duration_since(datetime_context),
             passed: datetime.le(&datetime_context),
             cache: HashMap::new(),
-        }
+        };
+        obj.process(false);
+        obj
     }
 
     /** Construct a new object from a `Date` then add `Local` timezone. */
     pub fn new_from_date_then_localize(date: Date<Utc>) -> Self {
         let datetime = date.and_hms(0, 0, 0).with_timezone(&Local);
         let datetime_context = Local::now();
-        Self {
+        let mut obj = Self {
             datetime_context,
             datetime,
             date: datetime.date(),
             duration: datetime.signed_duration_since(datetime_context),
             passed: datetime.le(&datetime_context),
             cache: HashMap::new(),
-        }
+        };
+        obj.process(false);
+        obj
     }
 
     /** Construct a new object with a custom `context`, rather than the default `now`. */
     pub fn new_with_context(datetime: DateTime<Local>, context: DateTime<Local>) -> Self {
-        Self {
+        let mut obj = Self {
             datetime_context: context,
             datetime,
             date: datetime.date(),
             duration: datetime.signed_duration_since(context),
             passed: datetime.le(&context),
             cache: HashMap::new(),
-        }
+        };
+        obj.process(false);
+        obj
     }
 
     /** Construct a new object from a `Date` with a custom `context`. */
     pub fn new_from_date_with_context(date: Date<Local>, context: Date<Local>) -> Self {
         let datetime = date.and_hms(0, 0, 0);
         let datetime_context = context.and_hms(0, 0, 0);
-        Self {
+        let mut obj = Self {
             datetime_context,
             datetime,
             date,
             duration: datetime.signed_duration_since(datetime_context),
             passed: datetime.le(&datetime_context),
             cache: HashMap::new(),
-        }
+        };
+        obj.process(false);
+        obj
     }
 
     /** Set the `Elapsed`'s datetime_context. Will clear cached `diff` values. */
@@ -133,6 +145,7 @@ impl Elapsed {
         self.datetime_context = datetime_context;
         self.duration = self.datetime.signed_duration_since(datetime_context);
         self.passed = self.datetime.le(&self.datetime_context);
+        self.process(true);
         self
     }
 
@@ -142,6 +155,7 @@ impl Elapsed {
         self.date = datetime.date();
         self.duration = datetime.signed_duration_since(self.datetime_context);
         self.passed = datetime.le(&self.datetime_context);
+        self.process(true);
         self
     }
 
@@ -151,13 +165,14 @@ impl Elapsed {
         self.datetime = date.and_hms(0, 0, 0);
         self.duration = self.datetime.signed_duration_since(self.datetime_context);
         self.passed = self.datetime.le(&self.datetime_context);
+        self.process(true);
     }
 
     /**
     Default behaviour currently. Discards "irrelevant" time frames, for example if date is due in
     more than a year, we'll only store `1y 6m` as opposed to `1y 6m 2w 4d`.
     */
-    pub fn process_all(&mut self) {
+    fn process(&mut self, clear_cache: bool) {
         /*
         All absolute values, we can assume values are below zero later on when we check `passed`,
         whilst we're building the str that represents time elapsed, we aren't concerned with past or
@@ -172,6 +187,10 @@ impl Elapsed {
         let minutes = diff.num_minutes().abs();
         let seconds = diff.num_seconds().abs();
 
+        if clear_cache {
+            self.cache = HashMap::new();
+        }
+
         if weeks > 0 {
             if weeks > 0 && weeks < 4 {
                 /* In n weeks, simples. */
@@ -180,7 +199,6 @@ impl Elapsed {
             /* Months: */
             {
                 /* Round down for months, easy for us to add remaining weeks. */
-                println!("weeks: {}", weeks);
                 let months = floor((weeks / 4) as f64, 0) as i64;
                 /*
                 Get remaining weeks, e.g.:
@@ -195,7 +213,6 @@ impl Elapsed {
                 } else
                 /* Potentially multiple years */
                 {
-                    println!("months: {}", months);
                     let years = floor((months / 12) as f64, 0) as i64;
                     let months_remaining = months - years * 12;
                     self.cache_insert(TimeFrame::Year, years);
@@ -233,22 +250,12 @@ impl Elapsed {
         val.1 = v;
     }
 
-    pub fn years(&mut self) -> Option<&(String, i64)> {
-        let years = floor((self.duration.num_weeks() / 52) as f64, 0) as i64;
-        if years.ne(&0) {
-            let tf = TimeFrame::Year;
-            self.cache_insert(tf, years);
-            self.cache.get(&tf)
-        } else {
-            None
-        }
+    pub fn years(&mut self) {
+        todo!()
     }
 
-    pub fn months(&mut self) -> Option<&(String, i64)> {
-        let months = floor((self.duration.num_weeks() / 4) as f64, 0) as i64;
-        let tf = TimeFrame::Month;
-        self.cache_insert(tf, months);
-        self.cache.get(&tf)
+    pub fn months(&mut self) {
+        todo!()
     }
 
     pub fn weeks(&mut self) {
@@ -459,8 +466,7 @@ mod tests {
         let past_dt = dt_str
             .parse::<DateTime<Local>>()
             .expect("failed to parse str as `DateTime<Local>`");
-        let mut obj = Elapsed::new(past_dt);
-        obj.process_all();
+        let obj = Elapsed::new(past_dt);
         println!("{}", obj)
     }
 }

@@ -10,7 +10,7 @@ license = "MIT OR Apache-2.0"
 name = "chrono_elapsed"
 readme = "README.md"
 repository = "https://github.com/aidenlangley/chrono_elapsed"
-version = "0.1.43"
+version = "0.1.44"
 
 [dependencies]
 chrono = "0.4.19"
