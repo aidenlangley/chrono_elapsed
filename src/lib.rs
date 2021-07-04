@@ -182,8 +182,8 @@ impl Elapsed {
     }
 
     /**
-    Default behaviour currently. Discards "irrelevant" time frames, for example if date is due in
-    more than a year, we'll only store `1y 6m` as opposed to `1y 6m 2w 4d`.
+    Populate `cache` with contextually aware `TimeFrame`s. Discards "irrelevant" time frames, for
+    example if date is due in more than a year, we'll only store `1y 6m` as opposed to `1y 6m 2w 4d`.
     */
     pub fn process(&mut self, clear_cache: bool) {
         /*
@@ -267,51 +267,104 @@ impl Elapsed {
         }
     }
 
-    /** Get years between `DateTime` and `DateTime` given for context. */
-    pub fn years(&mut self) -> &mut Self {
-        todo!()
+    /** Get number of years. */
+    pub fn num_years(&self) -> i64 {
+        floor((self.duration.num_weeks() / 52) as f64, 0) as i64
+    }
+
+    /** Get years between `DateTime` and `DateTime` given for context as `elapsed` style tuple. */
+    pub fn years(&mut self) -> TimeFrameTuple {
+        Self::as_tuple(TimeFrame::Year, self.num_years())
     }
 
     /**
-    Can be chained to string together multiple values.
-    Get years between `DateTime` and `DateTime` given for context.
-    Call `collect` to collect your prize! Or print me to see the goods.
+    Get years between `DateTime` and `DateTime` given for context. Can be chained to string together
+    multiple values of your choosing.
 
-    Note: is practically identical to `years`, all the magic is in the semantics.
+    ```rust
+    let date = self.years_and().months_and().weeks();
+    println!("{}", date);
+    let silly_date = self.years_and().seconds();
+    println!("{}", silly_date);
+    ```
+
+    Results in `1y 6m 2w` the first time, or something silly the second time..
     */
     pub fn years_and(&mut self) -> &mut Self {
         todo!()
     }
 
-    fn months(&mut self) -> &mut Self {
-        todo!()
-    }
-
-    fn weeks(&mut self) -> &mut Self {
-        todo!()
-    }
-
-    fn days(&mut self) -> &mut Self {
-        todo!()
-    }
-
-    fn hours(&mut self) -> &mut Self {
-        todo!()
-    }
-
-    fn minutes(&mut self) -> &mut Self {
-        todo!()
-    }
-
-    fn seconds(&mut self) -> &mut Self {
-        todo!()
+    /** Get number of months. */
+    pub fn num_months(&self) -> i64 {
+        floor((self.duration.num_weeks() / 4) as f64, 0) as i64
     }
 
     /**
-    This fn is intended to be used like so:
+    Get months between `DateTime` and `DateTime` given for context as `elapsed` style tuple.
+    */
+    pub fn months(&mut self) -> TimeFrameTuple {
+        Self::as_tuple(TimeFrame::Month, self.num_months())
+    }
+
+    /**
+    Get weeks between `DateTime` and `DateTime` given for context as `elapsed` style tuple.
+
+    Chrono provides a method to get numeric value alone, which is exposed by `Elapsed` struct
+    `duration` field.
+    */
+    pub fn weeks(&mut self) -> TimeFrameTuple {
+        Self::as_tuple(TimeFrame::Week, self.duration.num_weeks())
+    }
+
+    /**
+    Get days between `DateTime` and `DateTime` given for context as `elapsed` style tuple.
+
+    Chrono provides a method to get numeric value alone, which is exposed by `Elapsed` struct
+    `duration` field.
+    */
+    pub fn days(&mut self) -> TimeFrameTuple {
+        Self::as_tuple(TimeFrame::Day, self.duration.num_days())
+    }
+
+    /**
+    Get hours between `DateTime` and `DateTime` given for context as `elapsed` style tuple.
+
+    Chrono provides a method to get numeric value alone, which is exposed by `Elapsed` struct
+    `duration` field.*/
+    pub fn hours(&mut self) -> TimeFrameTuple {
+        Self::as_tuple(TimeFrame::Hour, self.duration.num_hours())
+    }
+
+    /**
+    Get minutes between `DateTime` and `DateTime` given for context as `elapsed` style tuple.
+
+    Chrono provides a method to get numeric value alone, which is exposed by `Elapsed` struct
+    `duration` field.
+    */
+    pub fn minutes(&mut self) -> TimeFrameTuple {
+        Self::as_tuple(TimeFrame::Minute, self.duration.num_minutes())
+    }
+
+    /**
+    Get seconds between `DateTime` and `DateTime` given for context as `elapsed` style tuple.
+
+    Chrono provides a method to get numeric value alone, which is exposed by `Elapsed` struct
+    `duration` field.
+    */
+    pub fn seconds(&mut self) -> TimeFrameTuple {
+        Self::as_tuple(TimeFrame::Second, self.duration.num_seconds())
+    }
+
+    /** Helper fn to get an elapsed style tuple. */
+    fn as_tuple(tf: TimeFrame, val: i64) -> TimeFrameTuple {
+        (format!("{}{}", val, tf.abbrev()).into(), val)
+    }
+
+    /**
+    This fn is intended to be used similarly to chaining, like so:
 
     ```rust
-    let date = self.seconds().through_til(&TimeFrame::Months);
+    let date = self.seconds_and().through_til(&TimeFrame::Months);
     println!("{}", date);
     ```
 
