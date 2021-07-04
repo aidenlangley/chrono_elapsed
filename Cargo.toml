@@ -2,14 +2,14 @@
 authors = ["Aiden Langley <me@aidenlangley.com>"]
 categories = ["date-and-time"]
 description = "A simple extension of chrono. Answers questions like: how much time has elapsed since date y? How long until date x will be upon us?"
-documentation = "https://docs.rs/chrono_elapsed/1.0.0/chrono_elapsed/"
+documentation = "https://docs.rs/chrono_elapsed/"
 edition = "2018"
 keywords = ["chrono", "duration", "due", "elapsed", "datetime"]
 license = "MIT OR Apache-2.0"
 name = "chrono_elapsed"
 readme = "README.md"
 repository = "https://github.com/aidenlangley/chrono_elapsed"
-version = "1.0.11"
+version = "1.0.12"
 
 [dependencies]
 chrono = "0.4.19"
