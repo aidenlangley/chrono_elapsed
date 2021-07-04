@@ -1,4 +1,4 @@
-use std::{collections::HashMap, convert::TryFrom, fmt::Display};
+use std::{borrow::Cow, collections::HashMap, convert::TryFrom, fmt::Display};
 
 use chrono::{Date, DateTime, Duration, Local, Utc};
 use math::round::floor;
@@ -37,7 +37,7 @@ pub struct Elapsed {
     Key being the sec/min/hour/day, etc. identifier.
     Value being a tuple of the `diff` value as a string in pos 0, and numeric value in pos 1.
     */
-    pub cache: HashMap<TimeFrame, (String, i64)>, // format: &'static str,
+    pub cache: HashMap<TimeFrame, (Cow<'static, str>, i64)>, // format: &'static str,
 }
 
 /* Aliasing `Elapsed` because these names might make more sense, depending on use-case. */
@@ -246,7 +246,7 @@ impl Elapsed {
 
     /** Helper function to insert a value for a `TimeFrame` into the cache. */
     pub fn cache_insert(&mut self, k: TimeFrame, v: i64) {
-        let tup = (format!("{}{}", v, k.abbrev()), v);
+        let tup = (format!("{}{}", v, k.abbrev()).into(), v);
         let val = self.cache.entry(k).or_insert(tup.clone());
         *val = tup;
     }
