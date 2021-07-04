@@ -180,6 +180,7 @@ impl Elapsed {
             /* Months: */
             {
                 /* Round down for months, easy for us to add remaining weeks. */
+                println!("weeks: {}", weeks);
                 let months = floor((weeks / 4) as f64, 0) as i64;
                 /*
                 Get remaining weeks, e.g.:
@@ -194,6 +195,7 @@ impl Elapsed {
                 } else
                 /* Potentially multiple years */
                 {
+                    println!("months: {}", months);
                     let years = floor((months / 12) as f64, 0) as i64;
                     let months_remaining = months - years * 12;
                     self.cache_insert(TimeFrame::Year, years);
@@ -449,8 +451,16 @@ impl Abbreviate for TimeFrame {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn print() {
+        let dt_str = "1993-10-30T04:20:00Z";
+        let past_dt = dt_str
+            .parse::<DateTime<Local>>()
+            .expect("failed to parse str as `DateTime<Local>`");
+        let mut obj = Elapsed::new(past_dt);
+        obj.process_all();
+        println!("{}", obj)
     }
 }
