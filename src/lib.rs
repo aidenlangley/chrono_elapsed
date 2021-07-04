@@ -461,12 +461,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn print() {
+    fn print_elapsed_since_birth() {
         let dt_str = "1993-10-30T04:20:00Z";
         let past_dt = dt_str
             .parse::<DateTime<Local>>()
             .expect("failed to parse str as `DateTime<Local>`");
-        let obj = Elapsed::new(past_dt);
-        println!("{}", obj)
+        let elapsed = Elapsed::new(past_dt);
+        println!("{}", elapsed)
+    }
+
+    #[test]
+    fn print_elapsed_since_recent() {
+        let now = Local::now();
+        let recent_dt = now - Duration::minutes(20);
+        let elapsed = Elapsed::new(recent_dt);
+        println!("{}", elapsed)
     }
 }
