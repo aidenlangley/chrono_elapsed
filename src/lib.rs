@@ -37,7 +37,18 @@ pub struct Elapsed {
     Key being the sec/min/hour/day, etc. identifier.
     Value being a tuple of the `diff` value as a string in pos 0, and numeric value in pos 1.
     */
-    pub cache: HashMap<TimeFrame, (Cow<'static, str>, i64)>, // format: &'static str,
+    pub cache: HashMap<TimeFrame, TimeFrameTuple>,
+    /*
+    TODO:
+    Customising display format can be done here.
+    */
+    // format: &'static str,
+    /*
+    TODO:
+    epoch could eventually be useful for running a timer that can be started via CLI.
+    A tick of the clock would then be a trigger to calculate if a minute had elapsed.
+    */
+    // epoch: i64,
 }
 
 /* Aliasing `Elapsed` because these names might make more sense, depending on use-case. */
@@ -45,6 +56,8 @@ pub struct Elapsed {
 pub type DueDateTime = Elapsed;
 /** Alias of `Elapsed`. */
 pub type TimeBetween = Elapsed;
+/** Private `TimeFrameTuple` to avoid duplicate code. */
+type TimeFrameTuple = (Cow<'static, str>, i64);
 
 impl Elapsed {
     /** Construct a new object. */
@@ -247,36 +260,71 @@ impl Elapsed {
     /** Helper function to insert a value for a `TimeFrame` into the cache. */
     pub fn cache_insert(&mut self, k: TimeFrame, v: i64) {
         let tup = (format!("{}{}", v, k.abbrev()).into(), v);
-        let val = self.cache.entry(k).or_insert(tup.clone());
-        *val = tup;
+        if let Some(v) = self.cache.get_mut(&k) {
+            *v = tup;
+        } else {
+            self.cache.insert(k, tup);
+        }
     }
 
-    fn years(&mut self) {
+    /** Get years between `DateTime` and `DateTime` given for context. */
+    pub fn years(&mut self) -> &mut Self {
         todo!()
     }
 
-    fn months(&mut self) {
+    /**
+    Can be chained to string together multiple values.
+    Get years between `DateTime` and `DateTime` given for context.
+    Call `collect` to collect your prize! Or print me to see the goods.
+
+    Note: is practically identical to `years`, all the magic is in the semantics.
+    */
+    pub fn years_and(&mut self) -> &mut Self {
         todo!()
     }
 
-    fn weeks(&mut self) {
+    fn months(&mut self) -> &mut Self {
         todo!()
     }
 
-    fn days(&mut self) {
+    fn weeks(&mut self) -> &mut Self {
         todo!()
     }
 
-    fn hours(&mut self) {
+    fn days(&mut self) -> &mut Self {
         todo!()
     }
 
-    fn minutes(&mut self) {
+    fn hours(&mut self) -> &mut Self {
         todo!()
     }
 
-    fn seconds(&mut self) {
+    fn minutes(&mut self) -> &mut Self {
         todo!()
+    }
+
+    fn seconds(&mut self) -> &mut Self {
+        todo!()
+    }
+
+    /**
+    This fn is intended to be used like so:
+
+    ```rust
+    let date = self.seconds().through_til(&TimeFrame::Months);
+    println!("{}", date);
+    ```
+
+    Resulting in seconds, minutes, hours, days, weeks and months being set in `cache`, and then
+    subsequently printed as `(in) 3y 2w 4d 12hr 32min 42sec (ago)`.
+    */
+    pub fn through_til(&mut self, tf: &TimeFrame) -> &mut Self {
+        todo!()
+    }
+
+    /** Create a clone of our `cache` containing the values at time of collection. */
+    pub fn collect(&self) -> HashMap<TimeFrame, TimeFrameTuple> {
+        self.cache.clone()
     }
 }
 
