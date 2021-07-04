@@ -1,5 +1,7 @@
 # chrono_elapsed
 
+https://crates.io/crates/chrono_elapsed.
+
 An extension of [chrono](https://crates.io/crates/chrono) to assist in reporting
 on due dates. I wrote this because I'm  building a [CLI](https://github.com/aidenlangley/clogi)
 in Rust and I chose to bring [Todoist](https://todoist.com) to the terminal
