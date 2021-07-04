@@ -23,13 +23,13 @@ pub struct Elapsed {
     datetime: DateTime<Local>,
     date: Date<Local>,
     /**
-    Also known as the `diff`, difference in time between a given `DateTime` and the `DateTime1 used
+    Also known as the `diff`, difference in time between a given `DateTime` and the `DateTime` used
     for context.
     */
     pub duration: Duration,
     /**
     If the date has already `passed`, or `elapsed`, it's no longer `due` so we can skip some
-    processing.
+    processing, and format a more meaningful message on display.
     */
     pub passed: bool,
     /**
@@ -247,8 +247,8 @@ impl Elapsed {
     /** Helper function to insert a value for a `TimeFrame` into the cache. */
     pub fn cache_insert(&mut self, k: TimeFrame, v: i64) {
         let tup = (format!("{}{}", v, k.abbrev()), v);
-        let val = self.cache.entry(k).or_insert(tup);
-        val.1 = v;
+        let val = self.cache.entry(k).or_insert(tup.clone());
+        *val = tup;
     }
 
     fn years(&mut self) {
