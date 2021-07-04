@@ -26,18 +26,18 @@ pub struct Elapsed {
     Also known as the `diff`, difference in time between a given `DateTime` and the `DateTime1 used
     for context.
     */
-    duration: Duration,
+    pub duration: Duration,
     /**
     If the date has already `passed`, or `elapsed`, it's no longer `due` so we can skip some
     processing.
     */
-    passed: bool,
+    pub passed: bool,
     /**
     A cache of `diff` values.
     Key being the sec/min/hour/day, etc. identifier.
     Value being a tuple of the `diff` value as a string in pos 0, and numeric value in pos 1.
     */
-    cache: HashMap<TimeFrame, (String, i64)>, // format: &'static str,
+    pub cache: HashMap<TimeFrame, (String, i64)>, // format: &'static str,
 }
 
 /* Aliasing `Elapsed` because these names might make more sense, depending on use-case. */
@@ -172,7 +172,7 @@ impl Elapsed {
     Default behaviour currently. Discards "irrelevant" time frames, for example if date is due in
     more than a year, we'll only store `1y 6m` as opposed to `1y 6m 2w 4d`.
     */
-    fn process(&mut self, clear_cache: bool) {
+    pub fn process(&mut self, clear_cache: bool) {
         /*
         All absolute values, we can assume values are below zero later on when we check `passed`,
         whilst we're building the str that represents time elapsed, we aren't concerned with past or
@@ -244,37 +244,38 @@ impl Elapsed {
         }
     }
 
-    fn cache_insert(&mut self, k: TimeFrame, v: i64) {
+    /** Helper function to insert a value for a `TimeFrame` into the cache. */
+    pub fn cache_insert(&mut self, k: TimeFrame, v: i64) {
         let tup = (format!("{}{}", v, k.abbrev()), v);
         let val = self.cache.entry(k).or_insert(tup);
         val.1 = v;
     }
 
-    pub fn years(&mut self) {
+    fn years(&mut self) {
         todo!()
     }
 
-    pub fn months(&mut self) {
+    fn months(&mut self) {
         todo!()
     }
 
-    pub fn weeks(&mut self) {
+    fn weeks(&mut self) {
         todo!()
     }
 
-    pub fn days(&mut self) {
+    fn days(&mut self) {
         todo!()
     }
 
-    pub fn hours(&mut self) {
+    fn hours(&mut self) {
         todo!()
     }
 
-    pub fn minutes(&mut self) {
+    fn minutes(&mut self) {
         todo!()
     }
 
-    pub fn seconds(&mut self) {
+    fn seconds(&mut self) {
         todo!()
     }
 }
@@ -336,7 +337,7 @@ impl From<Date<Utc>> for Elapsed {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum TimeFrame {
+pub enum TimeFrame {
     /*
     Tempted to leave millisecond out because by virtue this crate isn't dealing with micro and nano
     seconds, but milliseconds are useful in the Unix world. A millisecond to us wouldn't ever be
