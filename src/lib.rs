@@ -304,7 +304,12 @@ impl Display for Elapsed {
         if let Some(seconds) = self.cache.get(&TimeFrame::Second) {
             vec.push(&seconds.0);
         }
-        write!(f, "{}", vec.join(" "))
+
+        if self.passed {
+            write!(f, "{} ago", vec.join(" "))
+        } else {
+            write!(f, "in {}", vec.join(" "))
+        }
     }
 }
 
