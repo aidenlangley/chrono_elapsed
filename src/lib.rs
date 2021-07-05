@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, convert::TryFrom, fmt::Display};
+use std::{borrow::Cow, convert::TryFrom, fmt::Display, u64};
 
 use chrono::{Date, DateTime, Duration, Local, Utc};
 use math::round::floor;
@@ -33,11 +33,14 @@ pub struct Elapsed {
     */
     pub passed: bool,
     /**
-    A cache of `diff` values.
-    Key being the sec/min/hour/day, etc. identifier.
-    Value being a tuple of the `diff` value as a string in pos 0, and numeric value in pos 1.
+    No need for a HashMap. We want an ordered array, and we will use fixed positioning so we can
+    retrieve the data in the same order as the enum `TimeFrame`. Contains `Option<T>` because we'd
+    like to allow `None` when user is not concerned with a particular time frame.
+
+    We store a tuple for flexibility. Usually, we're just going to pull out the string, but there
+    might be times when we want the raw `u64`.
     */
-    pub cache: HashMap<TimeFrame, TimeFrameTuple>,
+    pub cache: Cache,
     /*
     TODO:
     Customising display format can be done here.
@@ -48,109 +51,169 @@ pub struct Elapsed {
     epoch could eventually be useful for running a timer that can be started via CLI.
     A tick of the clock would then be a trigger to calculate if a minute had elapsed.
     */
-    // epoch: i64,
+    // epoch: u64,
 }
 
-/* Aliasing `Elapsed` because these names might make more sense, depending on use-case. */
 /** Alias of `Elapsed`. */
 pub type DueDateTime = Elapsed;
 /** Alias of `Elapsed`. */
 pub type TimeBetween = Elapsed;
-/** Private `TimeFrameTuple` to avoid duplicate code. */
-type TimeFrameTuple = (Cow<'static, str>, i64);
+
+/** Private `TimeFrameTuple` type to avoid duplicate code. */
+type TimeFrameTuple = (Cow<'static, str>, u64);
+/**
+Private `Cache` type to avoid duplicate code. Note: remember to change size here if number of enum
+variants changes.
+*/
+type Cache = [Option<TimeFrameTuple>; 8];
 
 impl Elapsed {
-    /** Construct a new object. */
+    /** Construct a new object then immediately process it. */
     pub fn new(datetime: DateTime<Local>) -> Self {
+        let mut obj = Self::custom(datetime);
+        obj.process();
+        obj
+    }
+
+    /** Construct a new object from a `Date` rather than `DateTime` then immediately process it. */
+    pub fn new_from_date(date: Date<Local>) -> Self {
+        let mut obj = Self::custom_from_date(date);
+        obj.process();
+        obj
+    }
+
+    /** Construct a new object and then add `Local` timezone then immediately process it. */
+    pub fn new_then_localize(datetime: DateTime<Utc>) -> Self {
+        let mut obj = Self::custom_then_localize(datetime);
+        obj.process();
+        obj
+    }
+
+    /**
+    Construct a new object from a `Date` then add `Local` timezone then immediately process it.
+    */
+    pub fn new_from_date_then_localize(date: Date<Utc>) -> Self {
+        let mut obj = Self::custom_from_date_then_localize(date);
+        obj.process();
+        obj
+    }
+
+    /**
+    Construct a new object with a custom `context`, rather than the default `now` then immediately
+    process it.
+    */
+    pub fn new_with_context(datetime: DateTime<Local>, context: DateTime<Local>) -> Self {
+        let mut obj = Self::custom_with_context(datetime, context);
+        obj.process();
+        obj
+    }
+
+    /**
+    Construct a new object from a `Date` with a custom `context`  then immediately process it.
+    */
+    pub fn new_from_date_with_context(date: Date<Local>, context: Date<Local>) -> Self {
+        let mut obj = Self::custom_from_date_with_context(date, context);
+        obj.process();
+        obj
+    }
+
+    /**
+    Construct a new object without processing. You must select the values to calculate via `years`
+    or a sequence `years_and`, etc.
+    */
+    pub fn custom(datetime: DateTime<Local>) -> Self {
         let datetime_context = Local::now();
-        let mut obj = Self {
+        Self {
             datetime_context,
             datetime,
             date: datetime.date(),
             duration: datetime.signed_duration_since(datetime_context),
             passed: datetime.le(&datetime_context),
-            cache: HashMap::new(),
-        };
-        obj.process(false);
-        obj
+            cache: Cache::default(),
+        }
     }
 
-    /** Construct a new object from a `Date` rather than `DateTime`. */
-    pub fn new_from_date(date: Date<Local>) -> Self {
+    /**
+    Construct a new object from a `Date` rather than `DateTime` without processing. You must select
+    the values to calculate via `years` or a sequence `years_and`, etc.
+    */
+    pub fn custom_from_date(date: Date<Local>) -> Self {
         let datetime = date.and_hms(0, 0, 0);
         let datetime_context = Local::now();
-        let mut obj = Self {
+        Self {
             datetime_context,
             datetime,
             date,
             duration: datetime.signed_duration_since(datetime_context),
             passed: datetime.le(&datetime_context),
-            cache: HashMap::new(),
-        };
-        obj.process(false);
-        obj
+            cache: Cache::default(),
+        }
     }
 
-    /** Construct a new object and then add `Local` timezone. */
-    pub fn new_then_localize(datetime: DateTime<Utc>) -> Self {
+    /**
+    Construct a new object and then add `Local` timezone without processing. You must select the
+    values to calculate via `years` or a sequence `years_and`, etc.
+    */
+    pub fn custom_then_localize(datetime: DateTime<Utc>) -> Self {
         let datetime_context = Local::now();
         let datetime = datetime.with_timezone(&Local);
-        let mut obj = Self {
+        Self {
             datetime_context,
             datetime,
             date: datetime.date(),
             duration: datetime.signed_duration_since(datetime_context),
             passed: datetime.le(&datetime_context),
-            cache: HashMap::new(),
-        };
-        obj.process(false);
-        obj
+            cache: Cache::default(),
+        }
     }
 
-    /** Construct a new object from a `Date` then add `Local` timezone. */
-    pub fn new_from_date_then_localize(date: Date<Utc>) -> Self {
+    /**
+    Construct a new object from a `Date` then add `Local` timezone without processing. You must
+    select the values to calculate via `years` or a sequence `years_and`, etc.
+    */
+    pub fn custom_from_date_then_localize(date: Date<Utc>) -> Self {
         let datetime = date.and_hms(0, 0, 0).with_timezone(&Local);
         let datetime_context = Local::now();
-        let mut obj = Self {
+        Self {
             datetime_context,
             datetime,
             date: datetime.date(),
             duration: datetime.signed_duration_since(datetime_context),
             passed: datetime.le(&datetime_context),
-            cache: HashMap::new(),
-        };
-        obj.process(false);
-        obj
+            cache: Cache::default(),
+        }
     }
 
-    /** Construct a new object with a custom `context`, rather than the default `now`. */
-    pub fn new_with_context(datetime: DateTime<Local>, context: DateTime<Local>) -> Self {
-        let mut obj = Self {
+    /**
+    Construct a new object with a custom `context`, rather than the default `now` without
+    processing. You must select the values to calculate via `years` or a sequence `years_and`, etc.
+    */
+    pub fn custom_with_context(datetime: DateTime<Local>, context: DateTime<Local>) -> Self {
+        Self {
             datetime_context: context,
             datetime,
             date: datetime.date(),
             duration: datetime.signed_duration_since(context),
             passed: datetime.le(&context),
-            cache: HashMap::new(),
-        };
-        obj.process(false);
-        obj
+            cache: Cache::default(),
+        }
     }
 
-    /** Construct a new object from a `Date` with a custom `context`. */
-    pub fn new_from_date_with_context(date: Date<Local>, context: Date<Local>) -> Self {
+    /**
+    Construct a new object from a `Date` with a custom `context` without processing. You must select
+    the values to calculate via `years` or a sequence `years_and`, etc.
+    */
+    pub fn custom_from_date_with_context(date: Date<Local>, context: Date<Local>) -> Self {
         let datetime = date.and_hms(0, 0, 0);
         let datetime_context = context.and_hms(0, 0, 0);
-        let mut obj = Self {
+        Self {
             datetime_context,
             datetime,
             date,
             duration: datetime.signed_duration_since(datetime_context),
             passed: datetime.le(&datetime_context),
-            cache: HashMap::new(),
-        };
-        obj.process(false);
-        obj
+            cache: Cache::default(),
+        }
     }
 
     /** Set the `Elapsed`'s datetime_context. Will clear cached `diff` values. */
@@ -158,7 +221,8 @@ impl Elapsed {
         self.datetime_context = datetime_context;
         self.duration = self.datetime.signed_duration_since(datetime_context);
         self.passed = self.datetime.le(&self.datetime_context);
-        self.process(true);
+        self.clear_cache();
+        self.process();
         self
     }
 
@@ -168,7 +232,8 @@ impl Elapsed {
         self.date = datetime.date();
         self.duration = datetime.signed_duration_since(self.datetime_context);
         self.passed = datetime.le(&self.datetime_context);
-        self.process(true);
+        self.clear_cache();
+        self.process();
         self
     }
 
@@ -178,14 +243,15 @@ impl Elapsed {
         self.datetime = date.and_hms(0, 0, 0);
         self.duration = self.datetime.signed_duration_since(self.datetime_context);
         self.passed = self.datetime.le(&self.datetime_context);
-        self.process(true);
+        self.clear_cache();
+        self.process();
     }
 
     /**
     Populate `cache` with contextually aware `TimeFrame`s. Discards "irrelevant" time frames, for
     example if date is due in more than a year, we'll only store `1y 6m` as opposed to `1y 6m 2w 4d`.
     */
-    pub fn process(&mut self, clear_cache: bool) {
+    pub fn process(&mut self) {
         /*
         All absolute values, we can assume values are below zero later on when we check `passed`,
         whilst we're building the str that represents time elapsed, we aren't concerned with past or
@@ -194,15 +260,12 @@ impl Elapsed {
         `chrono` returns whole weeks, days, etc. so no rounding is present.
         */
         let diff = self.duration;
-        let weeks = diff.num_weeks().abs();
-        let days = diff.num_days().abs();
-        let hours = diff.num_hours().abs();
-        let minutes = diff.num_minutes().abs();
-        let seconds = diff.num_seconds().abs();
-
-        if clear_cache {
-            self.cache = HashMap::new();
-        }
+        let weeks = diff.num_weeks().abs() as u64;
+        let days = diff.num_days().abs() as u64;
+        let hours = diff.num_hours().abs() as u64;
+        let minutes = diff.num_minutes().abs() as u64;
+        let seconds = diff.num_seconds().abs() as u64;
+        let _milliseconds = diff.num_milliseconds().abs() as u64;
 
         if weeks > 0 {
             if weeks > 0 && weeks < 4 {
@@ -212,7 +275,7 @@ impl Elapsed {
             /* Months: */
             {
                 /* Round down for months, easy for us to add remaining weeks. */
-                let months = floor((weeks / 4) as f64, 0) as i64;
+                let months = floor((weeks / 4) as f64, 0) as u64;
                 /*
                 Get remaining weeks, e.g.:
                 6w [1m (+2w, rounded off)] - (1m * 4w) = 2w
@@ -226,7 +289,7 @@ impl Elapsed {
                 } else
                 /* Potentially multiple years */
                 {
-                    let years = floor((months / 12) as f64, 0) as i64;
+                    let years = floor((months / 12) as f64, 0) as u64;
                     let months_remaining = months - years * 12;
                     self.cache_insert(TimeFrame::Year, years);
                     self.cache_insert(TimeFrame::Month, months_remaining);
@@ -257,19 +320,33 @@ impl Elapsed {
         }
     }
 
-    /** Helper function to insert a value for a `TimeFrame` into the cache. */
-    pub fn cache_insert(&mut self, k: TimeFrame, v: i64) {
-        let tup = (format!("{}{}", v, k.abbrev()).into(), v);
-        if let Some(v) = self.cache.get_mut(&k) {
-            *v = tup;
-        } else {
-            self.cache.insert(k, tup);
+    /** Helper fn to insert a value for a `TimeFrame` into the cache. */
+    pub fn cache_insert(&mut self, k: TimeFrame, v: u64) {
+        self.cache[k as usize] = Some(Self::as_tuple(k, v));
+    }
+
+    /** Helper fn to keep the user in check before throwing wack values in the `cache`. */
+    fn protected_insert(&mut self, k: TimeFrame, v: u64) {
+        for i in 0..k as usize {
+            if let Some(_) = self.cache[i] {
+                panic!(
+                    "Please, let's try and be civil. Make your calls from largest `TimeFrame` to smallest."
+                )
+            }
+        }
+        self.cache_insert(k, v);
+    }
+
+    /** Helper fn to clear `HashMap`, bit unnecessary. */
+    pub fn clear_cache(&mut self) {
+        if !self.cache.is_empty() {
+            self.cache = Cache::default();
         }
     }
 
     /** Get number of years. */
-    pub fn num_years(&self) -> i64 {
-        floor((self.duration.num_weeks() / 52) as f64, 0) as i64
+    pub fn num_years(&self) -> u64 {
+        floor((self.duration.num_weeks() / 52) as f64, 0) as u64
     }
 
     /** Get years between `DateTime` and `DateTime` given for context as `elapsed` style tuple. */
@@ -279,31 +356,48 @@ impl Elapsed {
 
     /**
     Get years between `DateTime` and `DateTime` given for context. Can be chained to string together
-    multiple values of your choosing.
+    multiple values of your choosing; `cache` must be clear before doing this.
 
     ```rust
-    let date = self.years_and().months_and().weeks();
-    println!("{}", date);
-    let silly_date = self.years_and().seconds();
-    println!("{}", silly_date);
+    let dt = Local::now();
+    let mut elapsed = Elapsed::custom(dt);
+    println!("{}", elapsed.years_and().months_and().weeks());
+    elapsed.clear_cache();
+    // This one is silly.
+    println!("{}", elapsed.years_and().seconds());
     ```
 
-    Results in `1y 6m 2w` the first time, or something silly the second time..
+    Results in `1y 6m 2w` the first time, or something silly the second time.
+
+    Will panic if you do something extra silly like `elapsed.seconds_and().years()` (even though it
+    doesn't seem _that_ silly.) I have to enforce _some_ rules.
     */
     pub fn years_and(&mut self) -> &mut Self {
-        todo!()
+        self.protected_insert(TimeFrame::Year, self.num_years());
+        self
     }
 
     /** Get number of months. */
-    pub fn num_months(&self) -> i64 {
-        floor((self.duration.num_weeks() / 4) as f64, 0) as i64
+    pub fn num_months(&self) -> u64 {
+        floor((self.duration.num_weeks() / 4) as f64, 0) as u64
     }
 
     /**
     Get months between `DateTime` and `DateTime` given for context as `elapsed` style tuple.
     */
     pub fn months(&mut self) -> TimeFrameTuple {
-        Self::as_tuple(TimeFrame::Month, self.num_months())
+        let mut months = self.num_months();
+        if let Some(years) = &self.cache[TimeFrame::Year as usize] {
+            months -= years.1;
+        }
+        Self::as_tuple(TimeFrame::Month, months)
+    }
+
+    /**  */
+    pub fn months_and(&mut self) -> &mut Self {
+        let months = self.months().1 - (self.num_years() * 12);
+        self.protected_insert(TimeFrame::Month, months);
+        self
     }
 
     /**
@@ -313,7 +407,7 @@ impl Elapsed {
     `duration` field.
     */
     pub fn weeks(&mut self) -> TimeFrameTuple {
-        Self::as_tuple(TimeFrame::Week, self.duration.num_weeks())
+        Self::as_tuple(TimeFrame::Week, self.duration.num_weeks() as u64)
     }
 
     /**
@@ -323,7 +417,7 @@ impl Elapsed {
     `duration` field.
     */
     pub fn days(&mut self) -> TimeFrameTuple {
-        Self::as_tuple(TimeFrame::Day, self.duration.num_days())
+        Self::as_tuple(TimeFrame::Day, self.duration.num_days() as u64)
     }
 
     /**
@@ -332,7 +426,7 @@ impl Elapsed {
     Chrono provides a method to get numeric value alone, which is exposed by `Elapsed` struct
     `duration` field.*/
     pub fn hours(&mut self) -> TimeFrameTuple {
-        Self::as_tuple(TimeFrame::Hour, self.duration.num_hours())
+        Self::as_tuple(TimeFrame::Hour, self.duration.num_hours() as u64)
     }
 
     /**
@@ -342,7 +436,7 @@ impl Elapsed {
     `duration` field.
     */
     pub fn minutes(&mut self) -> TimeFrameTuple {
-        Self::as_tuple(TimeFrame::Minute, self.duration.num_minutes())
+        Self::as_tuple(TimeFrame::Minute, self.duration.num_minutes() as u64)
     }
 
     /**
@@ -352,11 +446,17 @@ impl Elapsed {
     `duration` field.
     */
     pub fn seconds(&mut self) -> TimeFrameTuple {
-        Self::as_tuple(TimeFrame::Second, self.duration.num_seconds())
+        const SEC_IN_MIN: u64 = 60;
+        const SEC_IN_HOUR: u64 = 3600;
+        const SEC_IN_DAY: u64 = 86400;
+        const SEC_IN_WEEK: u64 = 604800;
+        const SEC_IN_MONTH: u64 = 2629800;
+        const SEC_IN_YEAR: u64 = 31557600;
+        Self::as_tuple(TimeFrame::Second, self.duration.num_seconds() as u64)
     }
 
     /** Helper fn to get an elapsed style tuple. */
-    fn as_tuple(tf: TimeFrame, val: i64) -> TimeFrameTuple {
+    fn as_tuple(tf: TimeFrame, val: u64) -> TimeFrameTuple {
         (format!("{}{}", val, tf.abbrev()).into(), val)
     }
 
@@ -376,7 +476,7 @@ impl Elapsed {
     }
 
     /** Create a clone of our `cache` containing the values at time of collection. */
-    pub fn collect(&self) -> HashMap<TimeFrame, TimeFrameTuple> {
+    pub fn collect(&self) -> Cache {
         self.cache.clone()
     }
 }
@@ -384,26 +484,29 @@ impl Elapsed {
 impl Display for Elapsed {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut vec: Vec<&str> = Vec::new();
-        if let Some(years) = self.cache.get(&TimeFrame::Year) {
+        if let Some(years) = &self.cache[TimeFrame::Year as usize] {
             vec.push(&years.0);
         }
-        if let Some(months) = self.cache.get(&TimeFrame::Month) {
+        if let Some(months) = &self.cache[TimeFrame::Month as usize] {
             vec.push(&months.0);
         }
-        if let Some(weeks) = self.cache.get(&TimeFrame::Week) {
+        if let Some(weeks) = &self.cache[TimeFrame::Week as usize] {
             vec.push(&weeks.0);
         }
-        if let Some(days) = self.cache.get(&TimeFrame::Day) {
+        if let Some(days) = &self.cache[TimeFrame::Day as usize] {
             vec.push(&days.0);
         }
-        if let Some(hours) = self.cache.get(&TimeFrame::Hour) {
+        if let Some(hours) = &self.cache[TimeFrame::Hour as usize] {
             vec.push(&hours.0);
         }
-        if let Some(minutes) = self.cache.get(&TimeFrame::Minute) {
+        if let Some(minutes) = &self.cache[TimeFrame::Minute as usize] {
             vec.push(&minutes.0);
         }
-        if let Some(seconds) = self.cache.get(&TimeFrame::Second) {
+        if let Some(seconds) = &self.cache[TimeFrame::Second as usize] {
             vec.push(&seconds.0);
+        }
+        if let Some(milliseconds) = &self.cache[TimeFrame::MilliSecond as usize] {
+            vec.push(&milliseconds.0);
         }
 
         if self.passed {
@@ -443,20 +546,21 @@ impl From<Date<Utc>> for Elapsed {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(u8)]
 pub enum TimeFrame {
     /*
     Tempted to leave millisecond out because by virtue this crate isn't dealing with micro and nano
     seconds, but milliseconds are useful in the Unix world. A millisecond to us wouldn't ever be
     more than 60 however.
     */
-    MilliSecond,
-    Second,
-    Minute,
-    Hour,
-    Day,
-    Week,
-    Month,
-    Year,
+    MilliSecond = 0,
+    Second = 1,
+    Minute = 2,
+    Hour = 3,
+    Day = 4,
+    Week = 5,
+    Month = 6,
+    Year = 7,
     // Decade ...
 }
 
